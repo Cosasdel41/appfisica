@@ -6,7 +6,6 @@
   --card:#ffffff;
   --muted:#e6e1c9;
   --ok:#2a7a2a;
-  --warn:#9a6b00;
   --bad:#b23b3b;
   --radius:16px;
   --shadow:0 6px 16px rgba(36,73,110,.10);
@@ -16,21 +15,13 @@
 html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;line-height:1.3}
 
 /* ===== Header sticky para celular ===== */
-.app-header{
-  position:sticky; top:0; z-index:10;
-  padding:14px 16px;
-  background:var(--ink); color:var(--bg);
-  border-bottom:2px solid rgba(0,0,0,.05);
-}
+.app-header{position:sticky;top:0;z-index:10;padding:14px 16px;background:var(--ink);color:var(--bg);border-bottom:2px solid rgba(0,0,0,.05)}
 .app-header h1{margin:0;font-size:1.2rem;font-weight:800;letter-spacing:.2px}
 .subtitle{margin:.15rem 0 0;opacity:.92;font-size:.9rem}
 
 /* ===== Contenedor principal ===== */
 .container{display:grid;gap:12px;padding:12px}
-.panel{
-  background:var(--card); border-radius:var(--radius); padding:12px;
-  box-shadow:var(--shadow);
-}
+.panel{background:var(--card);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow)}
 h2{margin:.25rem 0 12px;font-size:1rem}
 
 /* ===== Progreso ===== */
@@ -38,6 +29,8 @@ h2{margin:.25rem 0 12px;font-size:1rem}
 #progreso-topline{font-weight:700}
 .progress{width:100%;height:12px;background:var(--muted);border-radius:999px;overflow:hidden}
 .progress-fill{height:100%;width:0%;background:var(--ink);transition:width .35s ease}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.btn.secondary{background:transparent;color:var(--ink);border:1px solid var(--muted)}
 
 /* ===== Buscador ===== */
 #search{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--muted);outline:none;font-size:1rem}
@@ -89,11 +82,10 @@ dialog{border:none;border-radius:18px;padding:0}
 
 /* ===== Footer ===== */
 .app-footer{padding:16px;text-align:center;opacity:.85;font-size:.85rem}
+.app-footer a{color:var(--ink);text-decoration:underline}
 
 /* ===== Accesibilidad y toques grandes ===== */
-@media (pointer:coarse){
-  .btn, .collapse-toggle, #search, .input-nota{min-height:44px}
-}
+@media (pointer:coarse){ .btn, .collapse-toggle, #search, .input-nota{min-height:44px} }
 
 /* ===== Desktop (manteniendo mobile-first) ===== */
 @media (min-width: 900px){
@@ -102,8 +94,3 @@ dialog{border:none;border-radius:18px;padding:0}
 }
 /* resaltado al saltar desde buscador */
 .pulse{box-shadow:0 0 0 3px rgba(36,73,110,.25)}
-
-
-/* acciones en el panel de progreso */
-.actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.btn.secondary{background:transparent;color:var(--ink);border:1px solid var(--muted)}
