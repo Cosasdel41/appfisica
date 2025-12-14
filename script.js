@@ -1,4 +1,3 @@
-
 const STATE_KEY = 'fisica_avance_v3';
 
 let materias = [];
@@ -29,13 +28,24 @@ function init(){
   renderMatriz();
 }
 
+/* =======================
+   PROMEDIO AUTOMÁTICO
+   ======================= */
+function calcularPromedio(state){
+  const notas = Object.values(state.aprobadas || {})
+    .map(r => Number(r.nota))
+    .filter(n => !Number.isNaN(n));
+
+  if(notas.length === 0) return null;
+  return notas.reduce((a,b)=>a+b,0) / notas.length;
+}
+
 function setupModal(){
   const dlg = document.getElementById('modal');
   document.getElementById('modal-close').onclick = ()=> dlg.close();
 }
 
 // === Reglas de aprobación ===
-// Asignatura: aprueba con nota >=4; Otros formatos: aprueba con nota >=7
 function passThreshold(m){
   const fmt = (m.formato || '').toLowerCase();
   return fmt.includes('asignatura') ? 4 : 7;
@@ -58,45 +68,33 @@ function setupBuscador(){
     const q = input.value.trim().toLowerCase();
     ul.innerHTML='';
     if(!q) return;
-    const hits = materias.filter(m => m.nombre.toLowerCase().includes(q)).slice(0,10);
-    for(const m of hits){
+    materias.filter(m => m.nombre.toLowerCase().includes(q)).slice(0,10).forEach(m => {
       const li = document.createElement('li');
       li.textContent = `${m.id}. ${m.nombre}`;
       li.onclick = ()=>{
         const el = document.querySelector(`[data-card-id="${m.id}"]`);
-        if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('pulse'); setTimeout(()=>el.classList.remove('pulse'), 800); }
+        if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('pulse'); setTimeout(()=>el.classList.remove('pulse'),800); }
       };
       ul.appendChild(li);
-    }
+    });
   });
 }
 
 // === Correlatividades ===
 function isHabilitada(m, state){
-  const haveApproved = (id) => {
+  const haveApproved = id => {
     const mm = materias.find(x=>x.id===id);
     return mm ? isAprobada(mm, state) : false;
   };
-  const haveCursada = (id) => {
+  const haveCursada = id => {
     const mm = materias.find(x=>x.id===id);
     return mm ? hasCursada(mm, state) : false;
   };
-  const allCursada = (arr) => arr.every(x => {
-    if (typeof x === 'number') return haveCursada(x);
-    if (x && x.anyOf) return x.anyOf.some(id => haveCursada(id));
-    return true;
-  });
-  const allAcreditar = (arr) => arr.every(x => {
-    if (typeof x === 'number') return haveApproved(x);
-    if (x && x.anyOf) return x.anyOf.some(id => haveApproved(id));
-    return true;
-  });
+  const allC = arr => arr.every(x => typeof x==='number' ? haveCursada(x) : x?.anyOf?.some(id=>haveCursada(id)) ?? true);
+  const allA = arr => arr.every(x => typeof x==='number' ? haveApproved(x) : x?.anyOf?.some(id=>haveApproved(id)) ?? true);
 
-  const reqC = m.prerrequisitos.requiresCursada || [];
-  const reqA = m.prerrequisitos.requiresAcreditar || [];
-  return allCursada(reqC) && allAcreditar(reqA);
+  return allC(m.prerrequisitos.requiresCursada||[]) && allA(m.prerrequisitos.requiresAcreditar||[]);
 }
-
 function statusDeMateria(m, state){
   if (isAprobada(m, state)) return {tipo:'APROBADA', clase:'aprobada'};
   return isHabilitada(m, state) ? {tipo:'HABILITADA', clase:'habilitada'} : {tipo:'BLOQUEADA', clase:'bloqueada'};
@@ -115,65 +113,26 @@ function renderChecklist(){
 
     const head = document.createElement('div');
     head.className = 'card-header';
-    head.innerHTML = `<div class="card-title">${m.id}. ${m.nombre}</div>
-      <span class="badge ${st.clase}">${st.tipo}</span>`;
+    head.innerHTML = `<div class="card-title">${m.id}. ${m.nombre}</div><span class="badge ${st.clase}">${st.tipo}</span>`;
 
     const meta = document.createElement('div');
     meta.className = 'meta';
     meta.textContent = `Año: ${m.anio} • Régimen: ${m.regimen} • Formato: ${m.formato}`;
 
-    const row = document.createElement('div');
-    row.className = 'row';
+    const row = document.createElement('div'); row.className='row';
 
-    const chk = document.createElement('input');
-    chk.type = 'checkbox';
-    chk.checked = !!state.cursadas[m.id];
-    chk.id = `cursada-${m.id}`;
-    const lbl = document.createElement('label');
-    lbl.htmlFor = chk.id;
-    lbl.textContent = 'Cursada';
-    chk.onchange = ()=>{
-      const s = loadState();
-      if(chk.checked){ s.cursadas[m.id] = true; } else { delete s.cursadas[m.id]; }
-      saveState(s);
-      renderChecklist(); renderMatriz(); renderProgreso();
-    };
+    const chk = document.createElement('input'); chk.type='checkbox'; chk.checked=!!state.cursadas[m.id]; chk.id=`cursada-${m.id}`;
+    const lbl = document.createElement('label'); lbl.htmlFor=chk.id; lbl.textContent='Cursada';
+    chk.onchange=()=>{ const s=loadState(); chk.checked? s.cursadas[m.id]=true : delete s.cursadas[m.id]; saveState(s); renderChecklist(); renderMatriz(); renderProgreso(); };
 
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.min = '0'; input.max = '10'; input.step='0.1';
-    input.placeholder = 'Nota';
-    input.className = 'input-nota';
-    input.value = state.aprobadas[m.id]?.nota ?? '';
-    const btn = document.createElement('button');
-    btn.className = 'btn';
-    btn.textContent = 'Guardar nota';
-    btn.onclick = ()=>{
-      const nota = parseFloat(input.value);
-      const s = loadState();
-      if(!Number.isNaN(nota)){
-        if(!s.aprobadas[m.id]) s.aprobadas[m.id] = {};
-        s.aprobadas[m.id].nota = nota;
-      }else{
-        delete s.aprobadas[m.id];
-      }
-      saveState(s);
-      renderChecklist(); renderMatriz(); renderProgreso();
-    };
+    const input = document.createElement('input'); input.type='number'; input.min='0'; input.max='10'; input.step='0.1'; input.placeholder='Nota'; input.className='input-nota'; input.value=state.aprobadas[m.id]?.nota ?? '';
+    const btn = document.createElement('button'); btn.className='btn'; btn.textContent='Guardar nota';
+    btn.onclick=()=>{ const n=parseFloat(input.value); const s=loadState(); if(!Number.isNaN(n)){ s.aprobadas[m.id]??={}; s.aprobadas[m.id].nota=n; } else delete s.aprobadas[m.id]; saveState(s); renderChecklist(); renderMatriz(); renderProgreso(); };
 
-    const um = document.createElement('div');
-    um.className = 'meta';
-    um.textContent = `Aprueba con ≥ ${passThreshold(m)}`;
+    const um = document.createElement('div'); um.className='meta'; um.textContent=`Aprueba con ≥ ${passThreshold(m)}`;
 
-    row.appendChild(chk);
-    row.appendChild(lbl);
-    row.appendChild(input);
-    row.appendChild(btn);
-
-    card.appendChild(head);
-    card.appendChild(meta);
-    card.appendChild(row);
-    card.appendChild(um);
+    row.append(chk,lbl,input,btn);
+    card.append(head,meta,row,um);
     cont.appendChild(card);
   });
 }
@@ -182,207 +141,72 @@ function renderChecklist(){
 function renderMatriz(){
   const grid = document.getElementById('matriz');
   const state = loadState();
-  grid.innerHTML = '';
+  grid.innerHTML='';
   materias.forEach(m => {
     const st = statusDeMateria(m, state);
     const box = document.createElement('div');
     box.className = `materia-box ${st.clase}`;
-
     const nota = state.aprobadas[m.id]?.nota;
-    const notaTxt = (nota !== undefined && nota !== '') ? ` • Nota: ${nota}` : '';
-
-    box.innerHTML = `<div class="nombre">${m.id}. ${m.nombre}</div>
-      <div class="detalle">Año ${m.anio} • ${m.regimen} • ${m.formato}${notaTxt}</div>`;
-
-    box.onclick = () => {
-      if(st.clase === 'bloqueada'){
-        mostrarBloqueo(m, state);
-      }else if(st.clase === 'habilitada'){
-        const val = prompt(`Ingresá la nota final para “${m.nombre}” (aprueba con ≥ ${passThreshold(m)}). Dejá vacío para no guardar.`);
-        if (val === null) return;
-        const nota = parseFloat(val);
-        const s = loadState();
-        if(!Number.isNaN(nota)){
-          if(!s.aprobadas[m.id]) s.aprobadas[m.id] = {};
-          s.aprobadas[m.id].nota = nota;
-          saveState(s);
-          renderChecklist(); renderMatriz(); renderProgreso();
-        }
-      }else{
-        const cur = state.aprobadas[m.id]?.nota ?? '';
-        const val = prompt(`Cosas del 41 te recomienda que al editar nota para “${m.nombre}” (actual: ${cur}). Borrar para eliminar.`, cur);
-        if (val === null) return;
-        const s = loadState();
-        if (val.trim()===''){
-          delete s.aprobadas[m.id];
-        } else {
-          const nota = parseFloat(val);
-          if(!Number.isNaN(nota)){
-            if(!s.aprobadas[m.id]) s.aprobadas[m.id] = {};
-            s.aprobadas[m.id].nota = nota;
-          }
-        }
-        saveState(s);
-        renderChecklist(); renderMatriz(); renderProgreso();
-      }
-    };
+    const notaTxt = nota!==undefined && nota!=='' ? ` • Nota: ${nota}` : '';
+    box.innerHTML = `<div class="nombre">${m.id}. ${m.nombre}</div><div class="detalle">Año ${m.anio} • ${m.regimen} • ${m.formato}${notaTxt}</div>`;
     grid.appendChild(box);
   });
-}
-
-// === Bloqueo (modal con nombres y lista) ===
-function requisitosFaltantesNombres(m, state){
-  const haveApproved = (id) => {
-    const mm = materias.find(x=>x.id===id);
-    return mm ? isAprobada(mm, state) : false;
-  };
-  const haveCursada = (id) => {
-    const mm = materias.find(x=>x.id===id);
-    return mm ? hasCursada(mm, state) : false;
-  };
-  const falt = [];
-  const pushIfMissingC = (token)=>{
-    if (typeof token === 'number'){
-      if (!haveCursada(token)){
-        const mm = materias.find(x=>x.id===token);
-        if(mm) falt.push(mm.nombre);
-      }
-    } else if (token && token.anyOf){
-      const ok = token.anyOf.some(id => haveCursada(id));
-      if (!ok){
-        const names = token.anyOf.map(id => (materias.find(x=>x.id===id)||{}).nombre).filter(Boolean);
-        falt.push('al menos una de: ' + names.join(', '));
-      }
-    }
-  };
-  const pushIfMissingA = (token)=>{
-    if (typeof token === 'number'){
-      if (!haveApproved(token)){
-        const mm = materias.find(x=>x.id===token);
-        if(mm) falt.push(mm.nombre);
-      }
-    } else if (token && token.anyOf){
-      const ok = token.anyOf.some(id => haveApproved(id));
-      if (!ok){
-        const names = token.anyOf.map(id => (materias.find(x=>x.id===id)||{}).nombre).filter(Boolean);
-        falt.push('al menos una de: ' + names.join(', '));
-      }
-    }
-  };
-  (m.prerrequisitos.requiresCursada||[]).forEach(pushIfMissingC);
-  (m.prerrequisitos.requiresAcreditar||[]).forEach(pushIfMissingA);
-  return falt;
-}
-
-function mostrarBloqueo(m, state){
-  const faltan = requisitosFaltantesNombres(m, state);
-  const body = document.getElementById('modal-body');
-  body.innerHTML = `<strong>Para cursar:</strong> ${m.nombre}<br><strong>Necesitás:</strong>` + (faltan.length ? ('<ul>' + faltan.map(x=>`<li>${x}</li>`).join('') + '</ul>') : ' <em>No pudimos determinar los requisitos.</em>');
-  document.getElementById('modal').showModal();
 }
 
 // === Progreso ===
 function renderProgreso(){
   const state = loadState();
   const total = materias.length;
-  const aprobadasIds = Object.keys(state.aprobadas).map(k=>Number(k)).filter(id => {
-    const m = materias.find(x=>x.id===id);
-    return m && isAprobada(m, state);
-  });
-  const aprobadas = aprobadasIds.length;
-  const porcentaje = total > 0 ? Math.round((aprobadas/total)*100) : 0;
+  const aprobadas = Object.keys(state.aprobadas).filter(id=>{
+    const m = materias.find(x=>x.id===Number(id));
+    return m && isAprobada(m,state);
+  }).length;
+  const porcentaje = total ? Math.round((aprobadas/total)*100) : 0;
 
   const topline = document.getElementById('progreso-topline');
   if(topline){
     const curs = Object.keys(state.cursadas||{}).length;
-    topline.textContent = `Aprobadas: ${aprobadas}/${total} (${porcentaje}%) • Cursadas: ${curs}`;
+    const prom = calcularPromedio(state);
+    const promTxt = prom!==null ? ` • Promedio: ${prom.toFixed(2)}` : '';
+    topline.textContent = `Aprobadas: ${aprobadas}/${total} (${porcentaje}%) • Cursadas: ${curs}${promTxt}`;
   }
+
   const fill = document.getElementById('progress-fill');
-  if(fill){ fill.style.width = porcentaje + '%'; }
+  if(fill) fill.style.width = porcentaje+'%';
 
   const nota = document.getElementById('progreso-nota');
   if(nota){
-    let msg = '';
-    if (porcentaje === 100){
-      msg = 'Felicitaciones, podes anotarte en el 108 A';
-    } else if (porcentaje >= 75){
-      msg = 'Podes anotarte en el listado 108 b Item 4';
-    } else if (porcentaje >= 50){
-      msg = 'Podes anotarte en el listado 108 b Item 5';
-    } else if (porcentaje > 25){
-      msg = 'Podes anotarte en el listado de Emergencia';
-    } else {
-      msg = 'Seguí sumando materias para habilitar listados.';
-    }
-    nota.textContent = msg;
+    nota.textContent = porcentaje===100 ? 'Felicitaciones, podes anotarte en el 108 A'
+      : porcentaje>=75 ? 'Podes anotarte en el listado 108 b Item 4'
+      : porcentaje>=50 ? 'Podes anotarte en el listado 108 b Item 5'
+      : porcentaje>25 ? 'Podes anotarte en el listado de Emergencia'
+      : 'Seguí sumando materias para habilitar listados.';
   }
 }
 
 // === Colapsables ===
 function setupCollapsibles(){
-  // set initial arrows based on collapsed state
-  document.querySelectorAll('.collapse-toggle').forEach(btn0 => {
-    const targetId0 = btn0.getAttribute('data-target');
-    const panel0 = document.getElementById(targetId0);
-    if(panel0 && panel0.classList.contains('collapsed')){
-      btn0.textContent = btn0.textContent.replace('▾','▸');
-    }
-  });
-  document.querySelectorAll('.collapse-toggle').forEach(btn => {
-    const targetId = btn.getAttribute('data-target');
-    const panel = document.getElementById(targetId);
-    btn.addEventListener('click', ()=>{
-      panel.classList.toggle('collapsed');
-      btn.textContent = btn.textContent.includes('▾') ? btn.textContent.replace('▾','▸') : btn.textContent.replace('▸','▾');
-    });
+  document.querySelectorAll('.collapse-toggle').forEach(btn=>{
+    const panel=document.getElementById(btn.dataset.target);
+    btn.onclick=()=>{ panel.classList.toggle('collapsed'); btn.textContent=btn.textContent.includes('▾')?btn.textContent.replace('▾','▸'):btn.textContent.replace('▸','▾'); };
   });
 }
 
-
-// === Exportar / Importar estado (JSON) ===
+// === Export / Import ===
 function setupExportImport(){
-  const btnExp = document.getElementById('exportar-estado');
-  const btnImp = document.getElementById('importar-estado');
-  const inputFile = document.getElementById('import-file');
-  if(btnExp){
-    btnExp.onclick = () => {
-      const state = loadState();
-      const payload = {
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        appKey: STATE_KEY,
-        totalMaterias: materias.length,
-        state
-      };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'progreso-profesorado-fisica.json';
-      document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(a.href);
-      a.remove();
-    };
-  }
-  if(btnImp && inputFile){
-    btnImp.onclick = () => inputFile.click();
-    inputFile.onchange = async () => {
-      const file = inputFile.files[0];
-      if(!file) return;
-      try{
-        const text = await file.text();
-        const data = JSON.parse(text);
-        if(!data || !data.state){ alert('Archivo inválido.'); return; }
-        if(!confirm('Esto reemplazará el estado actual (aprobadas/cursadas) por el importado. ¿Continuar?')) return;
-        localStorage.setItem(STATE_KEY, JSON.stringify(data.state));
-        renderChecklist(); renderMatriz(); renderProgreso();
-        alert('Estado importado correctamente.');
-      }catch(e){
-        alert('No se pudo importar el archivo.');
-      }finally{
-        inputFile.value = '';
-      }
-    };
-  }
+  const btnExp=document.getElementById('exportar-estado');
+  const btnImp=document.getElementById('importar-estado');
+  const inputFile=document.getElementById('import-file');
+
+  if(btnExp){ btnExp.onclick=()=>{
+    const payload={version:1,exportedAt:new Date().toISOString(),appKey:STATE_KEY,totalMaterias:materias.length,state:loadState()};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='progreso-profesorado-fisica.json'; document.body.appendChild(a); a.click(); a.remove();
+  }; }
+
+  if(btnImp&&inputFile){ btnImp.onclick=()=>inputFile.click(); inputFile.onchange=async()=>{
+    try{ const data=JSON.parse(await inputFile.files[0].text()); if(!data?.state) throw 0; localStorage.setItem(STATE_KEY,JSON.stringify(data.state)); renderChecklist(); renderMatriz(); renderProgreso(); alert('Estado importado correctamente.'); }
+    catch{ alert('Archivo inválido.'); }
+    finally{ inputFile.value=''; }
+  }; }
 }
-// === /Exportar / Importar estado ===
