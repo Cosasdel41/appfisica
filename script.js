@@ -39,6 +39,20 @@ function init(){
   renderMatriz();
 }
 
+/* =======================
+   PROMEDIO AUTOMÁTICO
+   ======================= */
+function calcularPromedio(state){
+  const notas = Object.values(state.aprobadas || {})
+    .map(reg => Number(reg.nota))
+    .filter(n => !Number.isNaN(n));
+
+  if(notas.length === 0) return null;
+
+  const suma = notas.reduce((a,b)=>a+b, 0);
+  return suma / notas.length;
+}
+
 // Export/Import
 function setupExportImport(){
   const btnExp = document.getElementById('exportar-estado');
@@ -168,10 +182,15 @@ function renderProgreso(){
   const state=loadState(); const total=materias.length;
   const aprobadasIds=Object.keys(state.aprobadas).map(k=>Number(k)).filter(id=>{ const m=materias.find(x=>x.id===id); return m && isAprobada(m,state); });
   const aprobadas=aprobadasIds.length; const porcentaje=total>0?Math.round((aprobadas/total)*100):0;
-  const topline=document.getElementById('progreso-topline'); if(topline){ const curs=Object.keys(state.cursadas||{}).length; topline.textContent=`Aprobadas: ${aprobadas}/${total} (${porcentaje}%) • Cursadas: ${curs}`; }
-  const fill=document.getElementById('progress-fill'); if(fill){ fill.style.width=porcentaje+'%'; }
-  const nota=document.getElementById('progreso-nota'); if(nota){ let msg=''; if(porcentaje===100) msg='Felicitaciones, podes anotarte en el 108 A'; else if(porcentaje>=75) msg='Podes anotarte en el listado 108 b Item 4'; else if(porcentaje>=50) msg='Podes anotarte en el listado 108 b Item 5'; else if(porcentaje>25) msg='Podes anotarte en el listado de Emergencia'; else msg='Seguí sumando materias para habilitar listados.'; nota.textContent=msg; }
-}
+
+  const topline=document.getElementById('progreso-topline');
+  if(topline){
+    const curs = Object.keys(state.cursadas||{}).length;
+    const promedio = calcularPromedio(state);
+    const promTxt = promedio !== null ? ` • Promedio: ${promedio.toFixed(2)}` : '';
+    topline.textContent =
+      `Aprobadas: ${aprobadas}/${total} (${porcentaje}%) • Cursadas: ${curs}${promTxt}`;
+  }
 
 // Colapsables
 function setupCollapsibles(){
