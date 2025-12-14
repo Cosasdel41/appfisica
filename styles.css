@@ -1,4 +1,3 @@
-
 /* ===== Paleta y base (mobile-first) ===== */
 :root{
   --bg:#f3efdc;        /* fondo crema */
@@ -28,7 +27,8 @@ h2{margin:.25rem 0 12px;font-size:1rem}
 #progreso-wrap{display:flex;flex-direction:column;gap:8px}
 #progreso-topline{font-weight:700}
 .progress{width:100%;height:12px;background:var(--muted);border-radius:999px;overflow:hidden}
-.progress-fill{height:100%;width:0%;background:var(--ink);transition:width .35s ease}
+/* CORRECCIÓN: coincide con el id usado en JS */
+#progress-fill{height:100%;width:0%;background:var(--ink);transition:width .35s ease}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .btn.secondary{background:transparent;color:var(--ink);border:1px solid var(--muted)}
 
@@ -92,5 +92,6 @@ dialog{border:none;border-radius:18px;padding:0}
   .container{grid-template-columns:1fr 1fr 1fr}
   .app-header h1{font-size:1.35rem}
 }
+
 /* resaltado al saltar desde buscador */
 .pulse{box-shadow:0 0 0 3px rgba(36,73,110,.25)}
